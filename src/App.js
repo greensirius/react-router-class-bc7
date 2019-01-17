@@ -1,16 +1,18 @@
 // @flow
 
 import React from 'react';
-import {BrowserRouter, Route, Switch, Link, NavLink} from 'react-router-dom';
+import {BrowserRouter, Route, Switch, Link, NavLink, Redirect} from 'react-router-dom';
 
 import {About, Home, Contact, NotFound, User} from './pages';
 import {BASEURL} from './constants/system';
+
+import {setToken, getToken, removeToken} from './helpers/token';
 
 function Navigator() {
   return (
     <ul>
       <li>
-        <NavLink to="/" activeStyle={{color: 'green'}}>
+        <NavLink to="/" exact activeStyle={{color: 'green'}}>
           Home
         </NavLink>
       </li>
@@ -31,13 +33,25 @@ function Navigator() {
 }
 
 type State = {
-  isLogin: boolean
+  isLogin: boolean,
+  username: string,
+  password: string,
+  activeToken: ?string,
 };
 class App extends React.Component<{}, State> {
   state = {
-    isLogin: false
+    isLogin: false,
+    username: '',
+    password: '',
+    activeToken: null,
   };
+
+  componentDidMount() {
+    if (getToken() === 'admin') this.setState({isLogin: true, activeToken: 'admin'});
+  }
+
   render() {
+    const {isLogin, username, password} = this.state;
     return (
       <div className="App">
         <BrowserRouter>
@@ -49,22 +63,49 @@ class App extends React.Component<{}, State> {
               <Route path="/contact/" component={Contact} />
               <Route
                 path="/user/:username"
-                render={(props) => (
-                  <User username={props.match.params.username} />
-                )}
+                render={(props) =>
+                  isLogin ? <User username={props.match.params.username} /> : <Redirect to="/" />
+                }
               />
               <Route component={NotFound} />
             </Switch>
+            {!isLogin ? (
+              <div>
+                <input
+                  type="text"
+                  placeholder="username"
+                  onChange={(e) => this.setState({username: e.target.value})}
+                />
+                <input
+                  type="text"
+                  placeholder="password"
+                  onChange={(e) => this.setState({password: e.target.value})}
+                />
+              </div>
+            ) : null}
             <input
+              id="sessionBtn"
               type="button"
-              value={this.state.isLogin ? 'LOG-OUT' : 'LOG-IN'}
-              onClick={() => this.setState({isLogin: !this.state.isLogin})}
+              value={isLogin ? 'LOG-OUT' : 'LOG-IN'}
+              onClick={() => (!isLogin ? this._logIn(username, password) : this._logOut())}
             />
           </div>
         </BrowserRouter>
       </div>
     );
   }
+
+  _logIn = (username, password) => {
+    let isLoginSuccess = setToken(username, password);
+    isLoginSuccess
+      ? this.setState({isLogin: true, username: '', password: '', activeToken: getToken()})
+      : this.setState({isLogin: false, username: '', password: ''});
+  };
+
+  _logOut = () => {
+    removeToken();
+    this.setState({isLogin: false, username: '', password: '', activeToken: null});
+  };
 }
 
 export default App;
